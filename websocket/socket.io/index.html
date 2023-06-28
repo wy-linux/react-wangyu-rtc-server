@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/3.3.0/css/bootstrap.css" rel="stylesheet">
+    <title>聊天室</title>
+    <style>
+        .container {
+            margin-top: 80px;
+        }
+        .user {
+            color: green;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h2 class="text-center">欢迎光临聊天室！</h2>
+                        <div class="row">
+                            <div class="col-xs-6 text-center">
+                                <button onclick="join('Red')" class="btn btn-danger" id="joinRed">进入红房间</button>
+                                <button onclick="leave('Red')" style="display: none" class="btn btn-danger" id="leaveRed">离开红房间</button>
+                            </div>
+                            <div class="col-xs-6 text-center">
+                                <button onclick="join('Green')" class="btn btn-success"id="joinGreen">进入绿房间</button>
+                                <button onclick="leave('Green')" style="display: none" class="btn btn-success"id="leaveGreen">离开绿房间</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <ul style="height: 300px; overflow-y: scroll;" onclick="clickUser(event)" class="list-group" id="messageList">
+
+                        </ul>
+                    </div>
+                    <div class="panel-footer">
+                        <div class="row">
+                            <div class="col-md-10">
+                                <input onkeyup="handleKeyUp(event)" id="textMsg" type="text" class="form-control">
+                            </div>
+                            <div class="col-md-2">
+                                <div onclick="sendMsg()" id="sendBtn" class="btn btn-primary">发言</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.29.4/moment.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.29.4/locale/zh-cn.js"></script>
+    <script>
+        const textMsg = document.querySelector('#textMsg')
+        const sendBtn = document.querySelector('#sendBtn')
+        const messageList = document.querySelector('#messageList')
+
+        const socket = io.connect('/')
+        socket.on('connect', () => {
+            socket.emit('getAllMessages')
+        })
+        socket.on('allMessages', (messages) => {
+            const html = messages.map(message => `<li class="list-group-item">${getMessage(message)}</li>`).join('')
+            messageList.innerHTML = html
+            messageList.scrollTop = 500
+        })
+        function getMessage(message) {
+            return `<span class="user">${message.username}</span>: ${message.content} <span class="pull-right">${moment(message.createAt).fromNow()}</span>`
+        }
+        socket.on('message', (message) => {
+            const li = document.createElement('li')
+            li.innerHTML = getMessage(message)
+            li.className = 'list-group-item'
+            messageList.appendChild(li)
+            messageList.scrollTop = 500
+        })
+        socket.on('disconnect', () => {
+            console.log('断开连接')
+        })
+        function handleKeyUp(event) {
+            if(event.keyCode == 13) {
+                sendMsg()
+            }
+        }
+        function sendMsg() {
+            const content = textMsg.value
+            if(content) {
+                socket.send(content)
+                textMsg.value = ''
+            }
+        }
+        function clickUser(event) {
+            if(event.target.className == 'user') {
+                textMsg.value = `@${event.target.innerText} `
+            }
+        }
+        //加入某个房间
+        function join(roomName) {
+            socket.emit('join', roomName)
+        }
+        socket.on('joined', roomName => {
+            const joinBtn = document.querySelector('#join' + roomName)
+            const leaveBtn = document.querySelector('#leave' + roomName)
+            joinBtn.style.display = 'none'
+            leaveBtn.style.display = 'inline-block'
+        })
+        //离开房间
+        function leave(roomName) {
+            socket.emit('leave', roomName)
+        }
+        socket.on('leaved', roomName => {
+            const joinBtn = document.querySelector('#join' + roomName)
+            const leaveBtn = document.querySelector('#leave' + roomName)
+            joinBtn.style.display = 'inline-block'
+            leaveBtn.style.display = 'none'            
+        })
+    </script>
+</body>
+</html>
